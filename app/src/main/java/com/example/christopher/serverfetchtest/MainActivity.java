@@ -1,29 +1,27 @@
 package com.example.christopher.serverfetchtest;
 
-import android.support.v7.app.ActionBarActivity;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.lang.reflect.InvocationTargetException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-
-import javax.net.ssl.HttpsURLConnection;
+import java.util.concurrent.ExecutionException;
 
 
 public class MainActivity extends ActionBarActivity {
@@ -36,46 +34,149 @@ public class MainActivity extends ActionBarActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        InputStream iStream = null;
-
-        // Retrieve data from the server
         try {
-            //URL url = new URL("https://data.sparkfun.com/streams/5JrdjYwNOvfGqbQEJqLE");
 
-            URL url = new URL("http://www.google.com/");
-            HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
+            // Data from Website stream. Contains actual name of current place
+            URL fmdServer = new URL("https://data.sparkfun.com/streams/5JrdjYwNOvfGqbQEJqLE.json");
+            FetchRecent serverData = new FetchRecent();
+            serverData.execute(fmdServer);
+            JSONObject stream = serverData.get();
+            Log.i(DEBUGGING, "JSON Website: " + stream.toString());
 
-            urlConnection.setRequestMethod("POST");
-            Log.i(DEBUGGING, "setRequestMethod");
+            // Parse the location place name, latitude, and longitude
+            JSONObject locationJSONObj = stream.getJSONObject("stream").getJSONObject("_doc").getJSONObject("location");
+            String str = locationJSONObj.get("long").toString();
+            String latitude = locationJSONObj.get("lat").toString();
+            String longitude = locationJSONObj.get("lng").toString();
+            final String JSONSTREAM = "JSONSTREAM";
 
-            int code = urlConnection.getResponseCode();
-            Log.i(DEBUGGING, "getResponsecode");
+            Log.i(JSONSTREAM,"Place: " + str);
+            Log.i(JSONSTREAM,"Lat: " + latitude);
+            Log.i(JSONSTREAM,"Long: " + longitude);
 
-            Toast.makeText(this, "" + code, Toast.LENGTH_SHORT).show();
-
-            //urlConnection.setRequestProperty("Content-length", "0");
-            //urlConnection.setUseCaches(false);
-            //urlConnection.setAllowUserInteraction(false);
-            //urlConnection.connect();
-
-            //iStream = urlConnection.getInputStream();
-            //Toast.makeText(this, convertStreamToString(iStream), Toast.LENGTH_SHORT).show();
-
-            //iStream.close();
+            // Launch Google Maps
+  /*          Intent maps = new Intent(Intent.ACTION_VIEW), chooser = null;
+            maps.setData(Uri.parse("geo:" + latitude + "," + longitude));
+            chooser = Intent.createChooser(maps, "Launch Maps");
+            startActivity(chooser);*/
 
 
-        } catch (MalformedURLException e) {
-            Toast.makeText(this, "Caught MalformedRLException", Toast.LENGTH_SHORT).show();
-        } catch (IOException e) {
-            Toast.makeText(this, "Caught IOException", Toast.LENGTH_SHORT).show();
-        }
+            // Get all latitudes and longitudes from the server
+            URL fmdLogs = new URL("https://data.sparkfun.com/output/5JrdjYwNOvfGqbQEJqLE.json");
+            FetchAll locLog = new FetchAll();
+            locLog.execute(fmdLogs);
+            JSONArray locArray = locLog.get();
+            Log.i(DEBUGGING, "JSON Log: " + locArray.toString());
 
-        catch (Exception e) {
-            Toast.makeText(this, "Caught Exception", Toast.LENGTH_SHORT).show();
+            // Display latitudes and longitudes in the log
+            final String JSONLOGS = "JSONLOG";
+            for (int i = 0; i < locArray.length(); i++)
+            {
+                JSONObject point = (JSONObject) locArray.get(i);
+                Log.i(JSONLOGS, "Latitude: " + point.get("latitude"));
+                Log.i(JSONLOGS, "Longitude: " + point.get("longitude"));
+            }
 
+        } catch (MalformedURLException me) {
+            me.printStackTrace();
+        } catch (InterruptedException ie) {
+            ie.printStackTrace();
+        } catch (ExecutionException ee) {
+            ee.printStackTrace();
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
 
     }
+
+    private class FetchRecent extends AsyncTask<URL, Void, JSONObject>
+    {
+
+        @Override
+        protected JSONObject doInBackground(URL... params) {
+
+            HttpURLConnection urlConnection;
+            try {
+                urlConnection = (HttpURLConnection) params[0].openConnection();
+
+                urlConnection.setRequestMethod("GET");
+                Log.i(DEBUGGING, "setRequestMethod");
+
+                int code = urlConnection.getResponseCode();
+                Log.i(DEBUGGING, "getResponsecode: " + code);
+
+                String message = urlConnection.getResponseMessage();
+                Log.i(DEBUGGING, "getResponseMessage: " + message);
+
+                //urlConnection.setRequestProperty("Content-length", "0");
+                //urlConnection.setUseCaches(false);
+                //urlConnection.setAllowUserInteraction(false);
+                urlConnection.connect();
+
+                InputStream iStream = urlConnection.getInputStream();
+                String dataString = convertStreamToString(iStream);
+                Log.i(DEBUGGING, "website stream: " + dataString);
+
+                iStream.close();
+
+                return new JSONObject(dataString);
+
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            } catch (JSONException je) {
+                je.printStackTrace();
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
+
+
+
+    private class FetchAll extends AsyncTask<URL, Void, JSONArray>
+    {
+
+        @Override
+        protected JSONArray doInBackground(URL... params) {
+
+            HttpURLConnection urlConnection;
+            try {
+                urlConnection = (HttpURLConnection) params[0].openConnection();
+
+                urlConnection.setRequestMethod("GET");
+                Log.i(DEBUGGING, "setRequestMethod for all");
+
+                int code = urlConnection.getResponseCode();
+                Log.i(DEBUGGING, "getResponsecode for all: " + code);
+
+                String message = urlConnection.getResponseMessage();
+                Log.i(DEBUGGING, "getResponseMessage for all: " + message);
+
+                //urlConnection.setRequestProperty("Content-length", "0");
+                //urlConnection.setUseCaches(false);
+                //urlConnection.setAllowUserInteraction(false);
+                urlConnection.connect();
+
+                InputStream iStream = urlConnection.getInputStream();
+                String dataString = convertStreamToString(iStream);
+                Log.i(DEBUGGING, "log : " + dataString);
+
+                iStream.close();
+
+                return new JSONArray(dataString);
+
+            } catch (IOException ioe) {
+                ioe.printStackTrace();
+            } catch (JSONException je) {
+                je.printStackTrace();
+            } catch (Exception e){
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
+
 
     private String convertStreamToString(InputStream is) {
         String line = "";
