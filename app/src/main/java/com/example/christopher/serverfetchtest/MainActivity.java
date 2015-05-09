@@ -55,8 +55,10 @@ public class MainActivity extends ActionBarActivity {
             Log.i(JSONSTREAM,"Long: " + longitude);
 
             // Launch Google Maps
-  /*          Intent maps = new Intent(Intent.ACTION_VIEW), chooser = null;
-            maps.setData(Uri.parse("geo:" + latitude + "," + longitude));
+/*            Intent maps = new Intent(Intent.ACTION_VIEW), chooser = null;
+            String label = "FMD";
+            String uriString = "http://maps.google.com/maps?q=" + latitude + ',' + longitude + "("+ label +")&z=15";
+            maps.setData(Uri.parse(uriString));
             chooser = Intent.createChooser(maps, "Launch Maps");
             startActivity(chooser);*/
 
